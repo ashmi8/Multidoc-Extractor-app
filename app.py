@@ -1,40 +1,30 @@
-# Q&A Chatbot
-#from langchain.llms import OpenAI
-
 from dotenv import load_dotenv
-
-load_dotenv()  # take environment variables from .env.
-
 import streamlit as st
 import os
-import pathlib
-import textwrap
 from PIL import Image
-
-
 import google.generativeai as genai
 
+# Load environment variables
+load_dotenv()
 
-os.getenv("GOOGLE_API_KEY")
+# Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-## Function to load OpenAI model and get respones
+# ------------------ FUNCTIONS ------------------
 
-def get_gemini_response(input,image,prompt):
-    model = genai.GenerativeModel('gemini-2.5-pro')
-    response = model.generate_content([input,image[0],prompt])
+def get_gemini_response(model_name, input_text, image, prompt):
+    """Generate response using selected Gemini model"""
+    model = genai.GenerativeModel(model_name)
+    response = model.generate_content([input_text, image[0], prompt])
     return response.text
-    
 
 def input_image_setup(uploaded_file):
-    # Check if a file has been uploaded
+    """Prepare image for Gemini API input"""
     if uploaded_file is not None:
-        # Read the file into bytes
         bytes_data = uploaded_file.getvalue()
-
         image_parts = [
             {
-                "mime_type": uploaded_file.type,  # Get the mime type of the uploaded file
+                "mime_type": uploaded_file.type,
                 "data": bytes_data
             }
         ]
@@ -42,32 +32,46 @@ def input_image_setup(uploaded_file):
     else:
         raise FileNotFoundError("No file uploaded")
 
-
-##initialize our streamlit app
+# ------------------ STREAMLIT APP ------------------
 
 st.set_page_config(page_title="Gemini Image Demo")
+st.header("🧠 Gemini Multi-Doc Q&A Chatbot")
 
-st.header("Gemini Application")
-input=st.text_input("Input Prompt: ",key="input")
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-image=""   
+# Model selection
+model_choice = st.selectbox(
+    "Choose a Gemini model:",
+    [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+    ],
+    index=0
+)
+
+# Text input
+input_text = st.text_input("Ask something about the image:", key="input")
+
+# Image upload
+uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+image = ""
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image.", use_column_width=True)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
+# Button
+submit = st.button("Generate Response")
 
-submit=st.button("Tell me about the image")
-
+# Instruction prompt
 input_prompt = """
-               You are an expert in understanding invoices.
-               You will receive input images as invoices &
-               you will have to answer questions based on the input image
-               """
+You are an expert in understanding invoices.
+You will receive input images as invoices and answer questions based on the input image.
+"""
 
-## If ask button is clicked
-
+# Generate response
 if submit:
-    image_data = input_image_setup(uploaded_file)
-    response=get_gemini_response(input_prompt,image_data,input)
-    st.subheader("The Response is")
-    st.write(response)
+    try:
+        image_data = input_image_setup(uploaded_file)
+        response = get_gemini_response(model_choice, input_text, image_data, input_prompt)
+        st.subheader("🧾 The Response:")
+        st.write(response)
+    except Exception as e:
+        st.error(f"⚠️ Error: {e}")
